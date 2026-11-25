@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Bóveda Q — Finanzas Personales</title>
+  <meta name="description" content="Control de gastos, ingresos, bancos, cuentas y pagos fijos en Quetzales." />
+  <meta name="theme-color" content="#0F172A" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bóveda Q" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class'
+    };
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: #020617;
+      color: #0F172A;
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+    }
+    #app-shell {
+      width: 100%;
+      max-width: 480px;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    header.app-header {
+      padding-top: calc(14px + var(--sat));
+    }
+    nav.bottom-nav {
+      padding-bottom: calc(10px + var(--sab));
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .modal-backdrop {
+      animation: fadeIn 0.18s ease-out forwards;
+    }
+    .modal-sheet {
+      animation: slideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      padding-bottom: calc(20px + var(--sab));
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div id="app-shell" class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <!-- TOP BAR -->
+    <header class="app-header bg-slate-900 dark:bg-slate-900/95 text-white px-4 pb-4 sticky top-0 z-20 flex items-center justify-between border-b border-slate-800">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center font-extrabold text-slate-950 text-lg shadow-md">
+          Q
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-base font-bold tracking-tight leading-none">Bóveda Q</h1>
+            <span id="offline-badge" class="hidden text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Offline</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5" id="header-subtitle">Control multicuenta</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-1.5">
+        <button onclick="toggleDarkMode()" title="Modo oscuro / claro" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-amber-300 dark:text-sky-300 transition">
+          <i id="theme-icon" data-lucide="moon" class="w-4 h-4"></i>
+        </button>
+        <button onclick="openBackupModal()" title="Respaldo de datos" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-200 transition">
+          <i data-lucide="database" class="w-4 h-4"></i>
+        </button>
+        <button onclick="togglePrivacy()" title="Ocultar/Mostrar saldos" class="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-200 transition">
+          <i id="privacy-icon" data-lucide="eye" class="w-4 h-4"></i>
+        </button>
+        <button onclick="openAlertsModal()" title="Alertas de pagos fijos" class="relative w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-200 transition">
+          <i data-lucide="bell" class="w-4 h-4"></i>
+          <span id="alert-badge" class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content" class="flex-1 px-4 pt-4 pb-28 space-y-5 overflow-y-auto"></main>
+
+    <!-- BOTTOM NAVIGATION (5 SECCIONES: INICIO, CUENTAS, +, ANÁLISIS, BANCOS/FIJOS) -->
+    <nav class="bottom-nav fixed bottom-0 w-full max-w-[480px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-1 pt-2 z-30 grid grid-cols-5 items-center">
+      <button onclick="switchTab('inicio')" data-tab="inicio" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-emerald-600 dark:text-emerald-400">
+        <i data-lucide="home" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Inicio</span>
+      </button>
+
+      <button onclick="switchTab('cuentas')" data-tab="cuentas" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-400">
+        <i data-lucide="wallet" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Cuentas</span>
+      </button>
+
+      <div class="flex justify-center">
+        <button onclick="openTxModal()" class="-mt-7 w-14 h-14 rounded-full bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-slate-950 shadow-lg shadow-emerald-500/30 flex items-center justify-center transition">
+          <i data-lucide="plus" class="w-7 h-7 stroke-[2.5]"></i>
+        </button>
+      </div>
+
+      <button onclick="switchTab('analisis')" data-tab="analisis" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-400">
+        <i data-lucide="pie-chart" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Análisis</span>
+      </button>
+
+      <button onclick="switchTab('fijos')" data-tab="fijos" class="nav-btn relative flex flex-col items-center justify-center gap-0.5 text-slate-400">
+        <i data-lucide="calendar-clock" class="w-5 h-5"></i>
+        <span class="text-[10px] font-semibold">Fijos</span>
+        <span id="nav-fijos-dot" class="hidden absolute top-0 right-4 w-2 h-2 rounded-full bg-rose-500"></span>
+      </button>
+    </nav>
+
+    <!-- MODAL CONTAINER -->
+    <div id="modal-root" class="hidden fixed inset-0 z-50 flex items-end justify-center">
+      <div onclick="closeModal()" class="modal-backdrop fixed inset-0 bg-slate-950/70 backdrop-blur-[1px]"></div>
+      <div id="modal-box" class="modal-sheet relative w-full max-w-[480px] bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 rounded-t-3xl p-5 max-h-[90dvh] overflow-y-auto shadow-2xl z-10 border-t border-slate-200 dark:border-slate-800"></div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-slate-800 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-xl border border-slate-700"></div>
+  </div>
+
+  <script>
+    // =========================================================
+    // 1. ESTADO INICIAL Y PERSISTENCIA LOCALSTORAGE
+    // =========================================================
+    const STORAGE_KEY = 'boveda_q_state_v3';
+
+    const ENTITY_TYPES = {
+      banco: { label: 'Banco', icon: 'landmark' },
+      aplicacion: { label: 'Aplicación / Billetera', icon: 'smartphone' },
+      efectivo: { label: 'Efectivo', icon: 'banknote' }
+    };
+
+    const ACCOUNT_KINDS = {
+      cuenta: { label: 'Cuenta', icon: 'wallet' },
+      tarjeta: { label: 'Tarjeta', icon: 'credit-card' },
+      aplicacion: { label: 'Aplicación', icon: 'smartphone' },
+      efectivo: { label: 'Efectivo', icon: 'banknote' }
+    };
+
+    const PRESET_COLORS = [
+      '#0F172A',
+      '#1E3A8A',
+      '#047857',
+      '#B91C1C',
+      '#D97706',
+      '#6D28D9',
+      '#0284C7',
+      '#DB2777',
+      '#374151',
+      '#0D9488'
+    ];
+
+    const CATEGORIES = {
+      gasto: [
+        { id: 'comida', name: 'Comida', icon: 'utensils', color: '#F97316' },
+        { id: 'transporte', name: 'Transporte / Gas', icon: 'car', color: '#3B82F6' },
+        { id: 'servicios', name: 'Servicios / Recibos', icon: 'zap', color: '#EAB308' },
+        { id: 'estudios', name: 'Estudios / U', icon: 'graduation-cap', color: '#8B5CF6' },
+        { id: 'salud', name: 'Salud / Gym', icon: 'heart-pulse', color: '#EC4899' },
+        { id: 'ocio', name: 'Ocio / Salidas', icon: 'film', color: '#14B8A6' },
+        { id: 'otros', name: 'Otros', icon: 'package', color: '#64748B' }
+      ],
+      ingreso: [
+        { id: 'salario', name: 'Salario / Pago', icon: 'briefcase', color: '#10B981' },
+        { id: 'proyecto', name: 'Trabajo / Extra', icon: 'laptop', color: '#06B6D4' },
+        { id: 'mesada', name: 'Apoyo / Mesada', icon: 'wallet', color: '#6366F1' },
+        { id: 'otros_in', name: 'Otro ingreso', icon: 'plus-circle', color: '#22C55E' }
+      ]
+    };
+
+    function getDefaultState() {
+      const today = new Date();
+      const soonDay = Math.min(28, today.getDate() + 2);
+      const laterDay = Math.min(28, today.getDate() + 10);
+      const isoToday = today.toISOString().slice(0, 10);
+      const d2 = new Date(today.getFullYear(), today.getMonth(), Math.max(1, today.getDate() - 3)).toISOString().slice(0, 10);
+      const d3 = new Date(today.getFullYear(), today.getMonth(), Math.max(1, today.getDate() - 6)).toISOString().slice(0, 10);
+
+      return {
+        darkMode: false,
+        privacy: false,
+        activeTab: 'inicio',
+        analysisPeriod: 'mes', // 'mes' | 'todo'
+        analysisType: 'gasto', // 'gasto' | 'ingreso'
+        filterAccount: 'todas',
+        filterType: 'todos',
+        searchQuery: '',
+        institutions: [
+          { id: 'inst_1', name: 'Banco Industrial', kind: 'banco', color: '#1E3A8A' },
+          { id: 'inst_2', name: 'BAC Credomatic', kind: 'banco', color: '#B91C1C' },
+          { id: 'inst_3', name: 'Efectivo / Billetera', kind: 'efectivo', color: '#047857' },
+          { id: 'inst_4', name: 'Fri / Kash', kind: 'aplicacion', color: '#6D28D9' }
+        ],
+        accounts: [
+          { id: 'acc_1', institutionId: 'inst_1', alias: 'Monetaria Principal', type: 'cuenta', balance: 2450.00, limit: 0 },
+          { id: 'acc_2', institutionId: 'inst_3', alias: 'Efectivo Diario', type: 'efectivo', balance: 380.00, limit: 0 },
+          { id: 'acc_3', institutionId: 'inst_1', alias: 'Ahorro Meta', type: 'cuenta', balance: 4200.00, limit: 0 },
+          { id: 'acc_4', institutionId: 'inst_2', alias: 'Tarjeta Clásica', type: 'tarjeta', balance: 620.00, limit: 5000.00 }
+        ],
+        transactions: [
+          { id: 'tx_1', type: 'ingreso', amount: 3200.00, category: 'salario', accountId: 'acc_1', toAccountId: null, note: 'Pago quincena', date: isoToday },
+          { id: 'tx_2', type: 'gasto', amount: 345.00, category: 'transporte', accountId: 'acc_2', toAccountId: null, note: 'Gasolina y parqueo', date: isoToday },
+          { id: 'tx_3', type: 'gasto', amount: 420.00, category: 'comida', accountId: 'acc_1', toAccountId: null, note: 'Supermercado y almuerzos', date: d2 },
+          { id: 'tx_4', type: 'gasto', amount: 250.00, category: 'salud', accountId: 'acc_1', toAccountId: null, note: 'Mensualidad Gym', date: d3 },
+          { id: 'tx_5', type: 'ingreso', amount: 850.00, category: 'proyecto', accountId: 'acc_1', toAccountId: null, note: 'Proyecto freelance', date: d3 }
+        ],
+        fixedExpenses: [
+          { id: 'fix_1', name: 'Internet Residencial', amount: 299.00, category: 'servicios', accountId: 'acc_2', dayOfMonth: soonDay, leadDays: 3, lastPaidMonth: '' },
+          { id: 'fix_2', name: 'Plan Celular', amount: 150.00, category: 'servicios', accountId: 'acc_1', dayOfMonth: soonDay, leadDays: 5, lastPaidMonth: '' },
+          { id: 'fix_3', name: 'Gimnasio Mensual', amount: 250.00, category: 'salud', accountId: 'acc_1', dayOfMonth: laterDay, leadDays: 3, lastPaidMonth: '' }
+        ]
+      };
+    }
+
+    let state = (() => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('boveda_q_state_v2');
+        if (!raw) return getDefaultState();
+        return { ...getDefaultState(), ...JSON.parse(raw) };
+      } catch {
+        return getDefaultState();
+      }
+    })();
+
+    function applyTheme() {
+      const root = document.documentElement;
+      if (state.darkMode) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      const icon = document.getElementById('theme-icon');
+      if (icon) icon.setAttribute('data-lucide', state.darkMode ? 'sun' : 'moon');
+    }
+
+    function toggleDarkMode() {
+      state.darkMode = !state.darkMode;
+      saveState();
+      applyTheme();
+      render();
+      showToast(state.darkMode ? 'Modo oscuro activado' : 'Modo claro activado');
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      updateAlertIndicators();
+    }
+
+    // =========================================================
+    // 2. HELPERS DE INSTITUCIONES, CUENTAS Y COLORES
+    // =========================================================
+    function getInstitution(id) {
+      return state.institutions.find(i => i.id === id) || {
+        id: 'unknown',
+        name: 'Sin entidad',
+        kind: 'banco',
+        color: '#334155'
+      };
+    }
+
+    function getAccountDisplay(acc) {
+      if (!acc) return { title: 'Cuenta eliminada', subtitle: '', color: '#334155', kindLabel: 'Cuenta', icon: 'wallet', instName: 'Sin entidad' };
+      const inst = getInstitution(acc.institutionId);
+      const kindInfo = ACCOUNT_KINDS[acc.type] || ACCOUNT_KINDS.cuenta;
+      const title = acc.alias ? `${inst.name} · ${acc.alias}` : `${inst.name} (${kindInfo.label})`;
+      return {
+        title,
+        instName: inst.name,
+        alias: acc.alias || kindInfo.label,
+        color: inst.color || '#0F172A',
+        kindLabel: kindInfo.label,
+        icon: kindInfo.icon
+      };
+    }
+
+    function shadeColor(hex, percent) {
+      try {
+        let num = parseInt(hex.replace('#', ''), 16);
+        let amt = Math.round(2.55 * percent);
+        let R = (num >> 16) + amt;
+        let G = (num >> 8 & 0x00FF) + amt;
+        let B = (num & 0x0000FF) + amt;
+        return '#' + (
+          0x1000000 +
+          (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 +
+          (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 +
+          (B < 255 ? (B < 1 ? 0 : B) : 255)
+        ).toString(16).slice(1);
+      } catch {
+        return hex;
+      }
+    }
+
+    function formatQ(num) {
+      if (state.privacy) return 'Q •••••';
+      const val = Number(num || 0);
+      return 'Q ' + val.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function currentMonthKey() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function daysUntilBillingDay(dayOfMonth) {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const targetDayCurrent = Math.min(dayOfMonth, daysInCurrentMonth);
+      let targetDate = new Date(now.getFullYear(), now.getMonth(), targetDayCurrent);
+
+      if (targetDate < today) {
+        const nextMonth = now.getMonth() + 1;
+        const nextYear = now.getFullYear() + (nextMonth > 11 ? 1 : 0);
+        const normMonth = nextMonth % 12;
+        const daysInNext = new Date(nextYear, normMonth + 1, 0).getDate();
+        targetDate = new Date(nextYear, normMonth, Math.min(dayOfMonth, daysInNext));
+      }
+      return Math.round((targetDate - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function getAccountAvailable(acc) {
+      if (!acc) return 0;
+      if (acc.type === 'tarjeta') return Math.max(0, (acc.limit || 0) - (acc.balance || 0));
+      return Number(acc.balance || 0);
+    }
+
+    function evaluateFixedExpenses() {
+      const monthKey = currentMonthKey();
+      return state.fixedExpenses.map(fix => {
+        const acc = state.accounts.find(a => a.id === fix.accountId);
+        const accInfo = getAccountDisplay(acc);
+        const daysLeft = daysUntilBillingDay(Number(fix.dayOfMonth));
+        const available = getAccountAvailable(acc);
+        const isPaidThisMonth = fix.lastPaidMonth === monthKey;
+        const isEmpty = !acc || available <= 0;
+        const isInsufficient = !acc || available < Number(fix.amount);
+        const shortage = Math.max(0, Number(fix.amount) - available);
+        const withinLeadWindow = daysLeft <= Number(fix.leadDays || 3);
+        const needsAlert = !isPaidThisMonth && withinLeadWindow && isInsufficient;
+
+        return {
+          ...fix,
+          account: acc,
+          accInfo,
+          daysLeft,
+          available,
+          isPaidThisMonth,
+          isEmpty,
+          isInsufficient,
+          shortage,
+          withinLeadWindow,
+          needsAlert
+        };
+      }).sort((a, b) => a.daysLeft - b.daysLeft);
+    }
+
+    function updateAlertIndicators() {
+      const alerts = evaluateFixedExpenses().filter(f => f.needsAlert);
+      const badge = document.getElementById('alert-badge');
+      const dot = document.getElementById('nav-fijos-dot');
+      if (alerts.length > 0) {
+        badge.textContent = alerts.length;
+        badge.classList.remove('hidden');
+        dot.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+        dot.classList.add('hidden');
+      }
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+    }
+
+    function togglePrivacy() {
+      state.privacy = !state.privacy;
+      saveState();
+      render();
+    }
+
+    function switchTab(tab) {
+      state.activeTab = tab;
+      saveState();
+      render();
+    }
+
+    function findCategory(id) {
+      return [...CATEGORIES.gasto, ...CATEGORIES.ingreso].find(c => c.id === id) || { name: 'General', icon: 'circle', color: '#64748B' };
+    }
+
+    // =========================================================
+    // 3. VISTAS PRINCIPALES
+    // =========================================================
+    function render() {
+      applyTheme();
+      const privIcon = document.getElementById('privacy-icon');
+      privIcon.setAttribute('data-lucide', state.privacy ? 'eye-off' : 'eye');
+
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        const active = btn.dataset.tab === state.activeTab;
+        btn.classList.toggle('text-emerald-600', active);
+        btn.classList.toggle('dark:text-emerald-400', active);
+        btn.classList.toggle('text-slate-400', !active);
+      });
+
+      const main = document.getElementById('main-content');
+      if (state.activeTab === 'inicio') main.innerHTML = renderInicio();
+      if (state.activeTab === 'cuentas') main.innerHTML = renderCuentas();
+      if (state.activeTab === 'analisis') main.innerHTML = renderAnalisis();
+      if (state.activeTab === 'bancos') main.innerHTML = renderBancos();
+      if (state.activeTab === 'fijos') main.innerHTML = renderFijos();
+      if (state.activeTab === 'movimientos') main.innerHTML = renderMovimientos();
+
+      updateAlertIndicators();
+      lucide.createIcons();
+    }
+
+    function renderInicio() {
+      const liquidTotal = state.accounts
+        .filter(a => a.type !== 'tarjeta')
+        .reduce((sum, a) => sum + Number(a.balance || 0), 0);
+
+      const creditDebt = state.accounts
+        .filter(a => a.type === 'tarjeta')
+        .reduce((sum, a) => sum + Number(a.balance || 0), 0);
+
+      const monthPrefix = currentMonthKey();
+      const monthTxs = state.transactions.filter(t => (t.date || '').startsWith(monthPrefix));
+      const monthIncome = monthTxs.filter(t => t.type === 'ingreso').reduce((s, t) => s + Number(t.amount), 0);
+      const monthExpense = monthTxs.filter(t => t.type === 'gasto').reduce((s, t) => s + Number(t.amount), 0);
+
+      const evaluatedFixed = evaluateFixedExpenses();
+      const activeAlerts = evaluatedFixed.filter(f => f.needsAlert);
+
+      return `
+        <!-- PATRIMONIO -->
+        <section class="bg-slate-900 dark:bg-slate-900 border border-slate-800 text-white rounded-3xl p-5 shadow-lg relative overflow-hidden">
+          <div class="absolute -right-8 -top-8 w-36 h-36 rounded-full bg-emerald-500/15 blur-xl"></div>
+          <div class="flex items-center justify-between">
+            <p class="text-xs text-slate-400 font-medium">Saldo disponible total</p>
+            <button onclick="switchTab('bancos')" class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-emerald-400 flex items-center gap-1 transition">
+              <i data-lucide="landmark" class="w-3 h-3"></i> Bancos (${state.institutions.length})
+            </button>
+          </div>
+          <h2 class="text-3xl font-extrabold tracking-tight mt-1">${formatQ(liquidTotal)}</h2>
+          ${creditDebt > 0 ? `<p class="text-xs text-rose-300 mt-1">Saldo usado en tarjetas: ${formatQ(creditDebt)}</p>` : ''}
+
+          <div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800">
+            <div onclick="switchTab('analisis')" class="bg-slate-800/80 rounded-2xl p-3 cursor-pointer hover:bg-slate-800 transition">
+              <div class="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold">
+                <i data-lucide="arrow-down-left" class="w-3.5 h-3.5"></i> Ingresos mes
+              </div>
+              <p class="text-sm font-bold mt-1">${formatQ(monthIncome)}</p>
+            </div>
+            <div onclick="switchTab('analisis')" class="bg-slate-800/80 rounded-2xl p-3 cursor-pointer hover:bg-slate-800 transition">
+              <div class="flex items-center gap-1.5 text-rose-400 text-xs font-semibold">
+                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> Gastos mes
+              </div>
+              <p class="text-sm font-bold mt-1">${formatQ(monthExpense)}</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ALERTAS DE PAGOS FIJOS -->
+        ${activeAlerts.length > 0 ? `
+          <section class="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold text-xs uppercase tracking-wide">
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                <span>Aviso anticipado de pago (${activeAlerts.length})</span>
+              </div>
+              <button onclick="switchTab('fijos')" class="text-xs font-semibold text-rose-700 dark:text-rose-400 underline">Ver todos</button>
+            </div>
+            <div class="space-y-2.5">
+              ${activeAlerts.map(item => `
+                <div class="bg-white dark:bg-slate-900 rounded-xl p-3 border border-rose-100 dark:border-rose-900/50 shadow-sm">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p class="font-bold text-sm text-slate-900 dark:text-slate-100">${item.name}</p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Cobra el día <b>${item.dayOfMonth}</b> (${item.daysLeft === 0 ? '¡Hoy!' : `en ${item.daysLeft} día${item.daysLeft === 1 ? '' : 's'}`}) · <b>${item.accInfo.title}</b>
+                      </p>
+                      <p class="text-xs font-semibold text-rose-600 dark:text-rose-400 mt-1">
+                        ${item.isEmpty ? 'Cuenta vacía (Q 0.00).' : `Saldo actual: ${formatQ(item.available)}.`} Faltan ${formatQ(item.shortage)}
+                      </p>
+                    </div>
+                    <span class="font-extrabold text-sm text-slate-900 dark:text-slate-100">${formatQ(item.amount)}</span>
+                  </div>
+                  <div class="flex gap-2 mt-2.5">
+                    <button onclick="openFundModal('${item.id}')" class="flex-1 py-1.5 px-3 rounded-lg bg-slate-900 dark:bg-slate-800 text-white text-xs font-semibold hover:bg-slate-800 transition">
+                      Fondear cuenta
+                    </button>
+                    <button onclick="payFixedNow('${item.id}')" class="py-1.5 px-3 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-xs font-semibold hover:bg-emerald-200 transition">
+                      Ya lo pagué
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </section>
+        ` : ''}
+
+        <!-- MIS CUENTAS (CARRUSEL CON COLOR DEL BANCO/ENTIDAD) -->
+        <section class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Mis cuentas</h3>
+            <div class="flex items-center gap-3">
+              <button onclick="switchTab('bancos')" class="text-xs font-semibold text-slate-500 dark:text-slate-400">Bancos</button>
+              <button onclick="switchTab('cuentas')" class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                Ver todas (${state.accounts.length})
+              </button>
+            </div>
+          </div>
+          <div class="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+            ${state.accounts.map(acc => {
+              const info = getAccountDisplay(acc);
+              return `
+                <div onclick="openAccountModal('${acc.id}')" style="background: linear-gradient(135deg, ${info.color} 0%, ${shadeColor(info.color, -28)} 100%);" class="min-w-[215px] text-white rounded-2xl p-4 shadow-md cursor-pointer active:scale-[0.98] transition shrink-0">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-[10px] uppercase tracking-wider bg-black/25 px-2 py-0.5 rounded-full font-semibold">${info.kindLabel}</span>
+                    <i data-lucide="${info.icon}" class="w-4 h-4 text-white/85"></i>
+                  </div>
+                  <p class="text-[11px] text-white/80 font-medium mt-3 truncate">${info.instName}</p>
+                  <p class="text-xs font-bold text-white truncate">${info.alias}</p>
+                  <p class="text-lg font-extrabold mt-1">${formatQ(acc.balance)}</p>
+                  ${acc.type === 'tarjeta' ? `<p class="text-[11px] text-white/80 mt-0.5">Disponible: ${formatQ(getAccountAvailable(acc))}</p>` : ''}
+                </div>
+              `;
+            }).join('') || `
+              <button onclick="openAccountModal()" class="w-full py-6 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                + Agregar tu primera cuenta
+              </button>
+            `}
+          </div>
+        </section>
+
+        <!-- ÚLTIMOS MOVIMIENTOS -->
+        <section class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200">Movimientos recientes</h3>
+            <button onclick="switchTab('movimientos')" class="text-xs font-semibold text-slate-500 dark:text-slate-400">Ver historial</button>
+          </div>
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+            ${state.transactions.slice(0, 5).map(tx => renderTxRow(tx)).join('') || `
+              <p class="p-6 text-center text-xs text-slate-400">Aún no hay movimientos registrados. Toca el botón + para empezar.</p>
+            `}
+          </div>
+        </section>
+      `;
+    }
+
+    // =========================================================
+    // APARTADO EXCLUSIVO: ANÁLISIS CON GRÁFICAS (GASTOS E INGRESOS)
+    // =========================================================
+    function renderAnalisis() {
+      const monthPrefix = currentMonthKey();
+      const scopedTxs = state.transactions.filter(t => {
+        if (state.analysisPeriod === 'mes') return (t.date || '').startsWith(monthPrefix);
+        return true;
+      });
+
+      const totalIncome = scopedTxs.filter(t => t.type === 'ingreso').reduce((s, t) => s + Number(t.amount), 0);
+      const totalExpense = scopedTxs.filter(t => t.type === 'gasto').reduce((s, t) => s + Number(t.amount), 0);
+      const netBalance = totalIncome - totalExpense;
+      const savingsRate = totalIncome > 0 ? Math.max(0, Math.round(((totalIncome - totalExpense) / totalIncome) * 100)) : 0;
+
+      // Agrupación por categoría según tipo seleccionado (gasto o ingreso)
+      const activeType = state.analysisType;
+      const typeTxs = scopedTxs.filter(t => t.type === activeType);
+      const activeTotal = activeType === 'gasto' ? totalExpense : totalIncome;
+
+      const catTotalsMap = {};
+      typeTxs.forEach(t => {
+        catTotalsMap[t.category] = (catTotalsMap[t.category] || 0) + Number(t.amount);
+      });
+
+      const breakdown = Object.entries(catTotalsMap)
+        .map(([catId, amount]) => {
+          const meta = findCategory(catId);
+          const pct = activeTotal > 0 ? (amount / activeTotal) * 100 : 0;
+          return { catId, name: meta.name, icon: meta.icon, color: meta.color, amount, pct };
+        })
+        .sort((a, b) => b.amount - a.amount);
+
+      // Generar conic-gradient para gráfico de dona
+      let donutGradient = state.darkMode ? '#1E293B 0% 100%' : '#E2E8F0 0% 100%';
+      if (breakdown.length > 0 && activeTotal > 0) {
+        let accPct = 0;
+        const stops = breakdown.map(item => {
+          const start = accPct;
+          const end = accPct + item.pct;
+          accPct = end;
+          return `${item.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+        });
+        donutGradient = stops.join(', ');
+      }
+
+      // Tendencia de últimos 6 meses (Ingresos vs Gastos)
+      const monthsData = [];
+      const now = new Date();
+      const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const mTxs = state.transactions.filter(t => (t.date || '').startsWith(key));
+        const inc = mTxs.filter(t => t.type === 'ingreso').reduce((s, t) => s + Number(t.amount), 0);
+        const exp = mTxs.filter(t => t.type === 'gasto').reduce((s, t) => s + Number(t.amount), 0);
+        monthsData.push({ label: monthNames[d.getMonth()], inc, exp });
+      }
+      const maxBarVal = Math.max(1, ...monthsData.map(m => Math.max(m.inc, m.exp)));
+
+      // Distribución por cuenta
+      const accountUsage = state.accounts.map(acc => {
+        const info = getAccountDisplay(acc);
+        const spent = scopedTxs.filter(t => t.type === 'gasto' && t.accountId === acc.id).reduce((s, t) => s + Number(t.amount), 0);
+        const earned = scopedTxs.filter(t => t.type === 'ingreso' && t.accountId === acc.id).reduce((s, t) => s + Number(t.amount), 0);
+        return { info, spent, earned };
+      }).filter(a => a.spent > 0 || a.earned > 0);
+
+      return `
+        <section class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">Análisis financiero</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Comportamiento de tus ingresos y gastos</p>
+            </div>
+            <div class="bg-slate-200/80 dark:bg-slate-800 p-1 rounded-xl flex text-xs font-bold">
+              <button onclick="state.analysisPeriod='mes'; render();" class="px-2.5 py-1 rounded-lg transition ${state.analysisPeriod === 'mes' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}">Este mes</button>
+              <button onclick="state.analysisPeriod='todo'; render();" class="px-2.5 py-1 rounded-lg transition ${state.analysisPeriod === 'todo' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}">Todo</button>
+            </div>
+          </div>
+
+          <!-- RESUMEN COMPARATIVO -->
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3">
+              <p class="text-[10px] font-semibold text-slate-400 uppercase">Ingresos</p>
+              <p class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 mt-1 truncate">${formatQ(totalIncome)}</p>
+            </div>
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3">
+              <p class="text-[10px] font-semibold text-slate-400 uppercase">Gastos</p>
+              <p class="text-xs font-extrabold text-rose-600 dark:text-rose-400 mt-1 truncate">${formatQ(totalExpense)}</p>
+            </div>
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3">
+              <p class="text-[10px] font-semibold text-slate-400 uppercase">Balance</p>
+              <p class="text-xs font-extrabold ${netBalance >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600 dark:text-rose-400'} mt-1 truncate">${formatQ(netBalance)}</p>
+            </div>
+          </div>
+
+          <!-- BARRA DE PROPORCIÓN INGRESO VS GASTO -->
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-2.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-800 dark:text-slate-200">Flujo neto y ahorro</span>
+              <span class="font-bold text-emerald-600 dark:text-emerald-400">${savingsRate}% retenido</span>
+            </div>
+            <div class="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+              ${(totalIncome + totalExpense) > 0 ? `
+                <div style="width: ${(totalIncome / (totalIncome + totalExpense)) * 100}%" class="bg-emerald-500 h-full"></div>
+                <div style="width: ${(totalExpense / (totalIncome + totalExpense)) * 100}%" class="bg-rose-500 h-full"></div>
+              ` : ''}
+            </div>
+            <div class="flex justify-between text-[11px] text-slate-500 dark:text-slate-400">
+              <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Ingresos</span>
+              <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Gastos</span>
+            </div>
+          </div>
+
+          <!-- GRÁFICO CIRCULAR POR CATEGORÍA -->
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Desglose por categoría</h3>
+              <div class="bg-slate-100 dark:bg-slate-800 p-1 rounded-xl flex text-xs font-bold">
+                <button onclick="state.analysisType='gasto'; render();" class="px-2.5 py-1 rounded-lg transition ${activeType === 'gasto' ? 'bg-rose-500 text-white' : 'text-slate-500 dark:text-slate-400'}">Gastos</button>
+                <button onclick="state.analysisType='ingreso'; render();" class="px-2.5 py-1 rounded-lg transition ${activeType === 'ingreso' ? 'bg-emerald-500 text-slate-950' : 'text-slate-500 dark:text-slate-400'}">Ingresos</button>
+              </div>
+            </div>
+
+            <div class="flex flex-col items-center justify-center py-2">
+              <div class="relative w-44 h-44 rounded-full flex items-center justify-center shadow-inner" style="background: conic-gradient(${donutGradient});">
+                <div class="w-28 h-28 rounded-full bg-white dark:bg-slate-900 flex flex-col items-center justify-center text-center px-2 shadow-sm">
+                  <span class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">${activeType === 'gasto' ? 'Total gastado' : 'Total ganado'}</span>
+                  <span class="text-sm font-extrabold text-slate-900 dark:text-white mt-0.5">${formatQ(activeTotal)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              ${breakdown.map(item => `
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2">
+                      <span class="w-6 h-6 rounded-lg flex items-center justify-center" style="background:${item.color}20; color:${item.color}">
+                        <i data-lucide="${item.icon}" class="w-3.5 h-3.5"></i>
+                      </span>
+                      <span class="font-semibold text-slate-800 dark:text-slate-200">${item.name}</span>
+                    </div>
+                    <div class="text-right">
+                      <span class="font-bold text-slate-900 dark:text-white">${formatQ(item.amount)}</span>
+                      <span class="text-[11px] text-slate-400 ml-1">(${item.pct.toFixed(0)}%)</span>
+                    </div>
+                  </div>
+                  <div class="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full" style="width: ${item.pct}%; background-color: ${item.color};"></div>
+                  </div>
+                </div>
+              `).join('') || `<p class="text-center text-xs text-slate-400 py-4">No hay ${activeType === 'gasto' ? 'gastos' : 'ingresos'} en este período.</p>`}
+            </div>
+          </div>
+
+          <!-- GRÁFICO DE BARRAS: ÚLTIMOS 6 MESES -->
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Comparativa últimos 6 meses</h3>
+              <div class="flex items-center gap-3 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-emerald-500"></span> Ingreso</span>
+                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm bg-rose-500"></span> Gasto</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-6 gap-2 pt-3 items-end h-36 border-b border-slate-100 dark:border-slate-800 pb-2">
+              ${monthsData.map(m => {
+                const incH = Math.max(4, Math.round((m.inc / maxBarVal) * 100));
+                const expH = Math.max(4, Math.round((m.exp / maxBarVal) * 100));
+                return `
+                  <div class="flex flex-col items-center gap-1.5 h-full justify-end">
+                    <div class="flex items-end gap-1 h-24 w-full justify-center">
+                      <div title="Ingresos: ${formatQ(m.inc)}" style="height: ${m.inc > 0 ? incH : 3}%" class="w-2.5 rounded-t-md bg-emerald-500 transition-all"></div>
+                      <div title="Gastos: ${formatQ(m.exp)}" style="height: ${m.exp > 0 ? expH : 3}%" class="w-2.5 rounded-t-md bg-rose-500 transition-all"></div>
+                    </div>
+                    <span class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">${m.label}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- ACTIVIDAD POR CUENTA -->
+          ${accountUsage.length > 0 ? `
+            <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 space-y-3">
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white">Movimiento por cuenta</h3>
+              <div class="space-y-2.5">
+                ${accountUsage.map(u => `
+                  <div class="flex items-center justify-between text-xs py-1.5 border-b last:border-b-0 border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${u.info.color};"></span>
+                      <span class="font-semibold text-slate-800 dark:text-slate-200 truncate">${u.info.title}</span>
+                    </div>
+                    <div class="flex items-center gap-2.5 shrink-0 font-bold">
+                      ${u.earned > 0 ? `<span class="text-emerald-600 dark:text-emerald-400">+${formatQ(u.earned)}</span>` : ''}
+                      ${u.spent > 0 ? `<span class="text-rose-600 dark:text-rose-400">-${formatQ(u.spent)}</span>` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </section>
+      `;
+    }
+
+    // =========================================================
+    // APARTADO EXCLUSIVO: ADMINISTRACIÓN DE BANCOS, APPS Y EFECTIVO
+    // =========================================================
+    function renderBancos() {
+      return `
+        <section class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">Bancos y entidades</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Administra bancos, aplicaciones y efectivo con su color.</p>
+            </div>
+            <button onclick="openInstitutionModal()" class="px-3.5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i> Agregar
+            </button>
+          </div>
+
+          <div class="space-y-2.5">
+            ${state.institutions.map(inst => {
+              const kindMeta = ENTITY_TYPES[inst.kind] || ENTITY_TYPES.banco;
+              const linkedCount = state.accounts.filter(a => a.institutionId === inst.id).length;
+              return `
+                <div class="bg-white dark:bg-slate-900 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div style="background-color: ${inst.color};" class="w-11 h-11 rounded-2xl text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <i data-lucide="${kindMeta.icon}" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <h3 class="font-bold text-sm text-slate-900 dark:text-white truncate">${inst.name}</h3>
+                        <span class="w-3 h-3 rounded-full shrink-0 border border-black/10" style="background-color: ${inst.color};"></span>
+                      </div>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        ${kindMeta.label} · <b>${linkedCount}</b> cuenta${linkedCount === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button onclick="openInstitutionModal('${inst.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold">
+                      Editar
+                    </button>
+                    <button onclick="deleteInstitution('${inst.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50" title="Eliminar">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('') || `
+              <div class="bg-white dark:bg-slate-900 rounded-2xl p-8 text-center border border-slate-200 dark:border-slate-800 space-y-2">
+                <p class="text-xs text-slate-500 dark:text-slate-400">No has agregado bancos, aplicaciones ni efectivo todavía.</p>
+                <button onclick="openInstitutionModal()" class="px-4 py-2 rounded-xl bg-slate-900 dark:bg-emerald-500 text-white dark:text-slate-950 text-xs font-bold">
+                  Agregar el primero
+                </button>
+              </div>
+            `}
+          </div>
+        </section>
+      `;
+    }
+
+    // =========================================================
+    // APARTADO EXCLUSIVO: CUENTAS (VINCULADAS A BANCOS AGREGADOS)
+    // =========================================================
+    function renderCuentas() {
+      const liquidTotal = state.accounts
+        .filter(a => a.type !== 'tarjeta')
+        .reduce((s, a) => s + Number(a.balance || 0), 0);
+
+      return `
+        <section class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">Mis cuentas</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Disponible total: <b>${formatQ(liquidTotal)}</b></p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="switchTab('bancos')" class="px-3 py-2 rounded-xl bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center gap-1">
+                <i data-lucide="landmark" class="w-3.5 h-3.5"></i> Bancos
+              </button>
+              <button onclick="openAccountModal()" class="px-3.5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1 shadow-sm">
+                <i data-lucide="plus" class="w-4 h-4"></i> Nueva
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            ${state.accounts.map(acc => {
+              const info = getAccountDisplay(acc);
+              return `
+                <div style="background: linear-gradient(135deg, ${info.color} 0%, ${shadeColor(info.color, -28)} 100%);" class="text-white rounded-2xl p-4 shadow-md space-y-3">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                      <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                        <i data-lucide="${info.icon}" class="w-4 h-4 text-white"></i>
+                      </div>
+                      <div class="min-w-0">
+                        <p class="text-xs text-white/80 font-medium truncate">${info.instName}</p>
+                        <h3 class="text-sm font-extrabold text-white truncate">${info.alias}</h3>
+                      </div>
+                    </div>
+                    <span class="text-[10px] uppercase tracking-wider bg-black/25 px-2.5 py-1 rounded-full font-bold shrink-0">
+                      ${info.kindLabel}
+                    </span>
+                  </div>
+
+                  <div class="flex items-end justify-between pt-1">
+                    <div>
+                      <p class="text-[11px] text-white/75">${acc.type === 'tarjeta' ? 'Saldo utilizado' : 'Monto disponible'}</p>
+                      <p class="text-xl font-extrabold">${formatQ(acc.balance)}</p>
+                      ${acc.type === 'tarjeta' ? `<p class="text-[11px] text-white/80 mt-0.5">Cupo libre: ${formatQ(getAccountAvailable(acc))} de ${formatQ(acc.limit)}</p>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                      <button onclick="openAccountModal('${acc.id}')" class="px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-semibold">
+                        Editar
+                      </button>
+                      <button onclick="deleteAccount('${acc.id}')" class="p-1.5 rounded-lg bg-black/20 hover:bg-rose-600/80 text-white/90" title="Eliminar cuenta">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('') || `
+              <div class="bg-white dark:bg-slate-900 rounded-2xl p-8 text-center border border-slate-200 dark:border-slate-800 space-y-2">
+                <p class="text-xs text-slate-500 dark:text-slate-400">No tienes cuentas creadas aún.</p>
+                <button onclick="openAccountModal()" class="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold">
+                  Crear cuenta ahora
+                </button>
+              </div>
+            `}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderTxRow(tx) {
+      const acc = state.accounts.find(a => a.id === tx.accountId);
+      const toAcc = tx.toAccountId ? state.accounts.find(a => a.id === tx.toAccountId) : null;
+      const accTitle = getAccountDisplay(acc).title;
+      const toAccTitle = toAcc ? getAccountDisplay(toAcc).title : '';
+      const cat = findCategory(tx.category);
+      const isTransfer = tx.type === 'transferencia';
+      const isIncome = tx.type === 'ingreso';
+
+      return `
+        <div class="p-3.5 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style="background:${isTransfer ? '#0284C725' : cat.color + '22'}; color:${isTransfer ? '#0284C7' : cat.color}">
+              <i data-lucide="${isTransfer ? 'repeat' : cat.icon}" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">${tx.note || (isTransfer ? 'Transferencia' : cat.name)}</p>
+              <p class="text-[11px] text-slate-400 truncate">
+                ${isTransfer ? `${accTitle} → ${toAccTitle}` : `${accTitle} · ${tx.date}`}
+              </p>
+            </div>
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-sm font-bold ${isTransfer ? 'text-sky-600 dark:text-sky-400' : isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-900 dark:text-slate-100'}">
+              ${isTransfer ? '' : isIncome ? '+' : '-'}${formatQ(tx.amount)}
+            </p>
+            <button onclick="deleteTx('${tx.id}')" class="text-[10px] text-slate-400 hover:text-rose-500">Eliminar</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMovimientos() {
+      const filtered = state.transactions.filter(tx => {
+        if (state.filterAccount !== 'todas' && tx.accountId !== state.filterAccount && tx.toAccountId !== state.filterAccount) return false;
+        if (state.filterType !== 'todos' && tx.type !== state.filterType) return false;
+        if (state.searchQuery && !(tx.note || '').toLowerCase().includes(state.searchQuery.toLowerCase())) return false;
+        return true;
+      });
+
+      return `
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">Historial de movimientos</h2>
+            <button onclick="switchTab('inicio')" class="text-xs font-semibold text-slate-500 dark:text-slate-400">Volver</button>
+          </div>
+
+          <input type="text" value="${state.searchQuery}" oninput="state.searchQuery=this.value; render();" placeholder="Buscar por nota o concepto..." class="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500" />
+
+          <div class="flex gap-2 overflow-x-auto no-scrollbar">
+            <select onchange="state.filterAccount=this.value; render();" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <option value="todas" ${state.filterAccount === 'todas' ? 'selected' : ''}>Todas las cuentas</option>
+              ${state.accounts.map(a => `<option value="${a.id}" ${state.filterAccount === a.id ? 'selected' : ''}>${getAccountDisplay(a).title}</option>`).join('')}
+            </select>
+
+            <select onchange="state.filterType=this.value; render();" class="px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <option value="todos" ${state.filterType === 'todos' ? 'selected' : ''}>Todos los tipos</option>
+              <option value="gasto" ${state.filterType === 'gasto' ? 'selected' : ''}>Gastos</option>
+              <option value="ingreso" ${state.filterType === 'ingreso' ? 'selected' : ''}>Ingresos</option>
+              <option value="transferencia" ${state.filterType === 'transferencia' ? 'selected' : ''}>Transferencias</option>
+            </select>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+            ${filtered.map(tx => renderTxRow(tx)).join('') || `<p class="p-8 text-center text-xs text-slate-400">No hay movimientos con estos filtros.</p>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderFijos() {
+      const items = evaluateFixedExpenses();
+      const totalMonthly = items.reduce((s, i) => s + Number(i.amount), 0);
+
+      return `
+        <section class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-extrabold text-slate-900 dark:text-white">Gastos mensuales fijos</h2>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Total comprometido al mes: <b>${formatQ(totalMonthly)}</b></p>
+            </div>
+            <button onclick="openFixedModal()" class="px-3.5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs flex items-center gap-1 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i> Agregar
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            ${items.map(item => `
+              <div class="bg-white dark:bg-slate-900 rounded-2xl p-4 border ${item.needsAlert ? 'border-rose-300 dark:border-rose-800 ring-2 ring-rose-500/15' : 'border-slate-200 dark:border-slate-800'} shadow-sm space-y-3">
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${item.accInfo.color};"></span>
+                      <h3 class="font-bold text-sm text-slate-900 dark:text-white">${item.name}</h3>
+                      ${item.isPaidThisMonth
+                        ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">Pagado este mes</span>`
+                        : item.needsAlert
+                          ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300">Saldo insuficiente</span>`
+                          : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">En ${item.daysLeft}d</span>`
+                      }
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Se descuenta de: <b>${item.accInfo.title}</b>
+                    </p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">
+                      Cobro cada día <b>${item.dayOfMonth}</b> · Aviso <b>${item.leadDays} días antes</b>
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-base font-extrabold text-slate-900 dark:text-white">${formatQ(item.amount)}</p>
+                    <div class="flex items-center justify-end gap-2 mt-1">
+                      <button onclick="openFixedModal('${item.id}')" class="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white">Editar</button>
+                      <button onclick="deleteFixed('${item.id}')" class="text-[11px] font-semibold text-rose-500">Borrar</button>
+                    </div>
+                  </div>
+                </div>
+
+                ${!item.isPaidThisMonth ? `
+                  <div class="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                    <span class="text-[11px] ${item.isInsufficient ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-medium'}">
+                      ${item.isInsufficient ? `Faltan ${formatQ(item.shortage)} en cuenta` : `Saldo cubierto (${formatQ(item.available)})`}
+                    </span>
+                    <div class="flex gap-2">
+                      ${item.isInsufficient ? `<button onclick="openFundModal('${item.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-800 text-white text-[11px] font-semibold">Fondear</button>` : ''}
+                      <button onclick="payFixedNow('${item.id}')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500 text-slate-950 text-[11px] font-bold">Registrar pago</button>
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
+            `).join('') || `<p class="bg-white dark:bg-slate-900 rounded-2xl p-8 text-center text-xs text-slate-400 border border-slate-200 dark:border-slate-800">No tienes gastos fijos registrados aún.</p>`}
+          </div>
+        </section>
+      `;
+    }
+
+    // =========================================================
+    // 4. MODALES: BANCOS/ENTIDADES Y CUENTAS
+    // =========================================================
+    function openModal(html) {
+      document.getElementById('modal-box').innerHTML = html;
+      document.getElementById('modal-root').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeModal() {
+      document.getElementById('modal-root').classList.add('hidden');
+    }
+
+    function openInstitutionModal(editId = null) {
+      const inst = editId ? state.institutions.find(i => i.id === editId) : null;
+      const currentKind = inst?.kind || 'banco';
+      const currentColor = inst?.color || PRESET_COLORS[0];
+
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">${inst ? 'Editar banco o entidad' : 'Agregar banco, app o efectivo'}</h3>
+            <button onclick="closeModal()" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+
+          <form onsubmit="submitInstitution(event, '${editId || ''}')" class="space-y-4">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Tipo de entidad</label>
+              <input type="hidden" id="inst-kind" value="${currentKind}" />
+              <div class="grid grid-cols-3 gap-2 mt-1.5">
+                ${Object.entries(ENTITY_TYPES).map(([key, meta]) => `
+                  <button type="button" onclick="selectInstKind('${key}')" id="inst-kind-btn-${key}"
+                    class="inst-kind-btn py-2.5 px-2 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition ${currentKind === key ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}">
+                    <i data-lucide="${meta.icon}" class="w-4 h-4"></i>
+                    <span>${key === 'aplicacion' ? 'Aplicación' : meta.label}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Nombre</label>
+              <input id="inst-name" required value="${inst?.name || ''}" placeholder="Ej. Banco Industrial, Banrural, Fri, Efectivo" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-medium focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Color identificador</label>
+                <span id="inst-color-preview" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full text-white" style="background-color: ${currentColor};">Vista previa</span>
+              </div>
+              <input type="hidden" id="inst-color" value="${currentColor}" />
+              <div class="flex flex-wrap items-center gap-2.5 mt-2">
+                ${PRESET_COLORS.map(hex => `
+                  <button type="button" onclick="selectInstColor('${hex}')" data-hex="${hex}"
+                    style="background-color: ${hex};"
+                    class="color-swatch w-8 h-8 rounded-full transition transform active:scale-90 ${currentColor.toLowerCase() === hex.toLowerCase() ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white dark:ring-offset-slate-900 scale-110' : 'opacity-85 hover:opacity-100'}">
+                  </button>
+                `).join('')}
+                <label class="w-8 h-8 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-600 flex items-center justify-center cursor-pointer text-slate-500 dark:text-slate-300 hover:border-slate-500" title="Color personalizado">
+                  <i data-lucide="pipette" class="w-4 h-4"></i>
+                  <input type="color" value="${currentColor}" oninput="selectInstColor(this.value)" class="sr-only" />
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-sm shadow-sm">
+              Guardar entidad
+            </button>
+          </form>
+        </div>
+      `);
+    }
+
+    function selectInstKind(kind) {
+      document.getElementById('inst-kind').value = kind;
+      document.querySelectorAll('.inst-kind-btn').forEach(btn => {
+        const isSelected = btn.id === `inst-kind-btn-${kind}`;
+        btn.className = `inst-kind-btn py-2.5 px-2 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition ${isSelected ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`;
+      });
+    }
+
+    function selectInstColor(hex) {
+      document.getElementById('inst-color').value = hex;
+      const preview = document.getElementById('inst-color-preview');
+      if (preview) preview.style.backgroundColor = hex;
+      document.querySelectorAll('.color-swatch').forEach(btn => {
+        const match = btn.dataset.hex.toLowerCase() === hex.toLowerCase();
+        btn.className = `color-swatch w-8 h-8 rounded-full transition transform active:scale-90 ${match ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white dark:ring-offset-slate-900 scale-110' : 'opacity-85 hover:opacity-100'}`;
+      });
+    }
+
+    function submitInstitution(e, editId) {
+      e.preventDefault();
+      const payload = {
+        id: editId || 'inst_' + Date.now(),
+        name: document.getElementById('inst-name').value.trim(),
+        kind: document.getElementById('inst-kind').value,
+        color: document.getElementById('inst-color').value
+      };
+
+      if (editId) {
+        const idx = state.institutions.findIndex(i => i.id === editId);
+        if (idx !== -1) state.institutions[idx] = payload;
+      } else {
+        state.institutions.push(payload);
+      }
+      saveState();
+      closeModal();
+      render();
+      showToast('Entidad guardada');
+    }
+
+    function deleteInstitution(id) {
+      const inUse = state.accounts.some(a => a.institutionId === id);
+      if (inUse) {
+        showToast('No puedes borrarla porque tiene cuentas vinculadas');
+        return;
+      }
+      state.institutions = state.institutions.filter(i => i.id !== id);
+      saveState();
+      render();
+      showToast('Entidad eliminada');
+    }
+
+    function openAccountModal(editId = null) {
+      if (state.institutions.length === 0) {
+        showToast('Primero agrega un banco, app o efectivo');
+        switchTab('bancos');
+        openInstitutionModal();
+        return;
+      }
+
+      const acc = editId ? state.accounts.find(a => a.id === editId) : null;
+      const currentType = acc?.type || 'cuenta';
+
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">${acc ? 'Editar cuenta' : 'Nueva cuenta'}</h3>
+            <button onclick="closeModal()" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+
+          <form onsubmit="submitAccount(event, '${editId || ''}')" class="space-y-4">
+            <div>
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Banco / Entidad agregada</label>
+                <button type="button" onclick="closeModal(); switchTab('bancos'); openInstitutionModal();" class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  + Nuevo banco
+                </button>
+              </div>
+              <select id="acc-institution" required class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500">
+                ${state.institutions.map(inst => `
+                  <option value="${inst.id}" ${acc?.institutionId === inst.id ? 'selected' : ''}>
+                    ${inst.name} (${ENTITY_TYPES[inst.kind]?.label || 'Banco'})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Tipo (Tarjeta, Cuenta, Aplicación o Efectivo)</label>
+              <input type="hidden" id="acc-type" value="${currentType}" />
+              <div class="grid grid-cols-2 gap-2 mt-1.5">
+                ${Object.entries(ACCOUNT_KINDS).map(([key, meta]) => `
+                  <button type="button" onclick="selectAccountKind('${key}')" id="acc-kind-btn-${key}"
+                    class="acc-kind-btn py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center gap-2 transition ${currentType === key ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}">
+                    <i data-lucide="${meta.icon}" class="w-4 h-4"></i>
+                    <span>${meta.label}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Nombre o etiqueta de la cuenta</label>
+              <input id="acc-alias" required value="${acc?.alias || ''}" placeholder="Ej. Monetaria, Ahorros, Visa Oro, Efectivo" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            <div>
+              <label id="acc-balance-label" class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                ${currentType === 'tarjeta' ? 'Saldo usado actualmente (Q)' : 'Monto / Saldo inicial (Q)'}
+              </label>
+              <input id="acc-balance" type="number" step="0.01" required value="${acc ? acc.balance : '0.00'}" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-lg font-extrabold focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            <div id="acc-limit-wrapper" class="${currentType === 'tarjeta' ? '' : 'hidden'}">
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Límite de crédito de la tarjeta (Q)</label>
+              <input id="acc-limit" type="number" step="0.01" value="${acc?.limit || 0}" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-bold" />
+            </div>
+
+            <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-sm shadow-sm">
+              Guardar cuenta
+            </button>
+          </form>
+        </div>
+      `);
+    }
+
+    function selectAccountKind(kind) {
+      document.getElementById('acc-type').value = kind;
+      document.querySelectorAll('.acc-kind-btn').forEach(btn => {
+        const isSelected = btn.id === `acc-kind-btn-${kind}`;
+        btn.className = `acc-kind-btn py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center gap-2 transition ${isSelected ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`;
+      });
+      const limitWrap = document.getElementById('acc-limit-wrapper');
+      const balLabel = document.getElementById('acc-balance-label');
+      if (kind === 'tarjeta') {
+        limitWrap.classList.remove('hidden');
+        balLabel.textContent = 'Saldo usado actualmente (Q)';
+      } else {
+        limitWrap.classList.add('hidden');
+        balLabel.textContent = 'Monto / Saldo disponible (Q)';
+      }
+    }
+
+    function submitAccount(e, editId) {
+      e.preventDefault();
+      const payload = {
+        id: editId || 'acc_' + Date.now(),
+        institutionId: document.getElementById('acc-institution').value,
+        type: document.getElementById('acc-type').value,
+        alias: document.getElementById('acc-alias').value.trim(),
+        balance: parseFloat(document.getElementById('acc-balance').value || 0),
+        limit: parseFloat(document.getElementById('acc-limit').value || 0)
+      };
+
+      if (editId) {
+        const idx = state.accounts.findIndex(a => a.id === editId);
+        if (idx !== -1) state.accounts[idx] = payload;
+      } else {
+        state.accounts.push(payload);
+      }
+      saveState();
+      closeModal();
+      render();
+      showToast('Cuenta guardada');
+    }
+
+    function deleteAccount(id) {
+      state.accounts = state.accounts.filter(a => a.id !== id);
+      saveState();
+      render();
+      showToast('Cuenta eliminada');
+    }
+
+    // =========================================================
+    // 5. MOVIMIENTOS, PAGOS FIJOS, ALERTAS Y RESPALDO JSON
+    // =========================================================
+    function openTxModal(defaultType = 'gasto') {
+      if (state.accounts.length === 0) {
+        showToast('Primero crea una cuenta');
+        switchTab('cuentas');
+        openAccountModal();
+        return;
+      }
+
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Nuevo movimiento</h3>
+            <button onclick="closeModal()" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+            <button type="button" onclick="setTxType('gasto')" id="tab-gasto" class="tx-type-btn py-2 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-sm">Gasto</button>
+            <button type="button" onclick="setTxType('ingreso')" id="tab-ingreso" class="tx-type-btn py-2 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400">Ingreso</button>
+            <button type="button" onclick="setTxType('transferencia')" id="tab-transferencia" class="tx-type-btn py-2 rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400">Transferir</button>
+          </div>
+
+          <form onsubmit="submitTx(event)" class="space-y-3">
+            <input type="hidden" id="tx-type" value="${defaultType}" />
+
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Monto (Q)</label>
+              <input id="tx-amount" type="number" step="0.01" min="0.01" required placeholder="0.00" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-lg font-extrabold focus:outline-none focus:border-emerald-500" />
+            </div>
+
+            <div>
+              <label id="tx-acc-label" class="text-xs font-semibold text-slate-600 dark:text-slate-300">Cuenta</label>
+              <select id="tx-account" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                ${state.accounts.map(a => `<option value="${a.id}">${getAccountDisplay(a).title} (${formatQ(a.balance)})</option>`).join('')}
+              </select>
+            </div>
+
+            <div id="tx-to-wrapper" class="hidden">
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Cuenta destino</label>
+              <select id="tx-to-account" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                ${state.accounts.map((a, idx) => `<option value="${a.id}" ${idx === 1 ? 'selected' : ''}>${getAccountDisplay(a).title}</option>`).join('')}
+              </select>
+            </div>
+
+            <div id="tx-cat-wrapper">
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Categoría</label>
+              <select id="tx-category" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                ${CATEGORIES.gasto.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Fecha</label>
+                <input id="tx-date" type="date" value="${new Date().toISOString().slice(0, 10)}" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Nota (opcional)</label>
+                <input id="tx-note" type="text" placeholder="Ej. Cena, gasolina..." class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs" />
+              </div>
+            </div>
+
+            <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-sm shadow-md">
+              Guardar movimiento
+            </button>
+          </form>
+        </div>
+      `);
+    }
+
+    function setTxType(type) {
+      document.getElementById('tx-type').value = type;
+      ['gasto', 'ingreso', 'transferencia'].forEach(t => {
+        const btn = document.getElementById('tab-' + t);
+        const active = t === type;
+        btn.className = `tx-type-btn py-2 rounded-lg text-xs font-bold ${active ? 'bg-white dark:bg-slate-900 shadow-sm ' + (t === 'gasto' ? 'text-rose-600 dark:text-rose-400' : t === 'ingreso' ? 'text-emerald-600 dark:text-emerald-400' : 'text-sky-600 dark:text-sky-400') : 'text-slate-500 dark:text-slate-400'}`;
+      });
+      document.getElementById('tx-to-wrapper').classList.toggle('hidden', type !== 'transferencia');
+      document.getElementById('tx-cat-wrapper').classList.toggle('hidden', type === 'transferencia');
+      document.getElementById('tx-acc-label').textContent = type === 'transferencia' ? 'Cuenta origen' : 'Cuenta';
+
+      if (type !== 'transferencia') {
+        document.getElementById('tx-category').innerHTML = CATEGORIES[type].map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      }
+    }
+
+    function submitTx(e) {
+      e.preventDefault();
+      const type = document.getElementById('tx-type').value;
+      const amount = parseFloat(document.getElementById('tx-amount').value);
+      const accountId = document.getElementById('tx-account').value;
+      const toAccountId = document.getElementById('tx-to-account').value;
+      const category = document.getElementById('tx-category').value;
+      const date = document.getElementById('tx-date').value;
+      const note = document.getElementById('tx-note').value.trim();
+
+      if (type === 'transferencia' && accountId === toAccountId) {
+        showToast('Elige dos cuentas diferentes');
+        return;
+      }
+
+      applyBalanceChange(type, amount, accountId, toAccountId, 1);
+
+      state.transactions.unshift({
+        id: 'tx_' + Date.now(),
+        type,
+        amount,
+        category: type === 'transferencia' ? 'transfer' : category,
+        accountId,
+        toAccountId: type === 'transferencia' ? toAccountId : null,
+        date,
+        note
+      });
+
+      saveState();
+      closeModal();
+      render();
+      showToast('Movimiento registrado');
+    }
+
+    function applyBalanceChange(type, amount, accountId, toAccountId, dir) {
+      const acc = state.accounts.find(a => a.id === accountId);
+      if (acc) {
+        if (type === 'gasto') {
+          acc.balance = Number(acc.balance) + (acc.type === 'tarjeta' ? amount * dir : -amount * dir);
+        } else if (type === 'ingreso') {
+          acc.balance = Number(acc.balance) + (acc.type === 'tarjeta' ? -amount * dir : amount * dir);
+        } else if (type === 'transferencia') {
+          acc.balance = Number(acc.balance) - amount * dir;
+          const dest = state.accounts.find(a => a.id === toAccountId);
+          if (dest) {
+            dest.balance = Number(dest.balance) + (dest.type === 'tarjeta' ? -amount * dir : amount * dir);
+          }
+        }
+      }
+    }
+
+    function deleteTx(id) {
+      const idx = state.transactions.findIndex(t => t.id === id);
+      if (idx === -1) return;
+      const tx = state.transactions[idx];
+      applyBalanceChange(tx.type, Number(tx.amount), tx.accountId, tx.toAccountId, -1);
+      state.transactions.splice(idx, 1);
+      saveState();
+      render();
+      showToast('Movimiento eliminado y saldo revertido');
+    }
+
+    function openFixedModal(editId = null) {
+      const item = editId ? state.fixedExpenses.find(f => f.id === editId) : null;
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">${item ? 'Editar gasto fijo' : 'Nuevo gasto mensual fijo'}</h3>
+            <button onclick="closeModal()" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+          <form onsubmit="submitFixed(event, '${editId || ''}')" class="space-y-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Nombre del pago</label>
+              <input id="fix-name" required value="${item?.name || ''}" placeholder="Ej. Internet, Luz, Spotify, Renta" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm" />
+            </div>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Monto mensual (Q)</label>
+                <input id="fix-amount" type="number" step="0.01" min="0.01" required value="${item?.amount || ''}" placeholder="0.00" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-bold" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Día de cobro (1-31)</label>
+                <input id="fix-day" type="number" min="1" max="31" required value="${item?.dayOfMonth || 15}" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm font-bold" />
+              </div>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Cuenta de donde se descontará</label>
+              <select id="fix-account" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                ${state.accounts.map(a => `<option value="${a.id}" ${item?.accountId === a.id ? 'selected' : ''}>${getAccountDisplay(a).title}</option>`).join('')}
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-2.5">
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Avisar con anticipación</label>
+                <select id="fix-lead" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                  ${[1, 2, 3, 5, 7, 10].map(d => `<option value="${d}" ${(item?.leadDays || 3) === d ? 'selected' : ''}>${d} día${d === 1 ? '' : 's'} antes</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Categoría</label>
+                <select id="fix-cat" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                  ${CATEGORIES.gasto.map(c => `<option value="${c.id}" ${item?.category === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 text-slate-950 font-extrabold text-sm">
+              Guardar gasto fijo
+            </button>
+          </form>
+        </div>
+      `);
+    }
+
+    function submitFixed(e, editId) {
+      e.preventDefault();
+      const payload = {
+        id: editId || 'fix_' + Date.now(),
+        name: document.getElementById('fix-name').value.trim(),
+        amount: parseFloat(document.getElementById('fix-amount').value),
+        dayOfMonth: parseInt(document.getElementById('fix-day').value, 10),
+        accountId: document.getElementById('fix-account').value,
+        leadDays: parseInt(document.getElementById('fix-lead').value, 10),
+        category: document.getElementById('fix-cat').value,
+        lastPaidMonth: editId ? (state.fixedExpenses.find(f => f.id === editId)?.lastPaidMonth || '') : ''
+      };
+
+      if (editId) {
+        const idx = state.fixedExpenses.findIndex(f => f.id === editId);
+        if (idx !== -1) state.fixedExpenses[idx] = payload;
+      } else {
+        state.fixedExpenses.push(payload);
+      }
+      saveState();
+      closeModal();
+      render();
+      showToast('Gasto fijo guardado');
+    }
+
+    function deleteFixed(id) {
+      state.fixedExpenses = state.fixedExpenses.filter(f => f.id !== id);
+      saveState();
+      render();
+      showToast('Gasto fijo eliminado');
+    }
+
+    function payFixedNow(id) {
+      const fix = state.fixedExpenses.find(f => f.id === id);
+      if (!fix) return;
+      applyBalanceChange('gasto', Number(fix.amount), fix.accountId, null, 1);
+      fix.lastPaidMonth = currentMonthKey();
+      state.transactions.unshift({
+        id: 'tx_' + Date.now(),
+        type: 'gasto',
+        amount: Number(fix.amount),
+        category: fix.category || 'servicios',
+        accountId: fix.accountId,
+        toAccountId: null,
+        date: new Date().toISOString().slice(0, 10),
+        note: `Pago fijo: ${fix.name}`
+      });
+      saveState();
+      closeModal();
+      render();
+      showToast(`Pago registrado: ${fix.name}`);
+    }
+
+    function openFundModal(fixId) {
+      const item = evaluateFixedExpenses().find(f => f.id === fixId);
+      if (!item) return;
+      const otherAccounts = state.accounts.filter(a => a.id !== item.accountId && a.type !== 'tarjeta');
+
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Fondear cuenta para pago</h3>
+            <button onclick="closeModal()" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+          <p class="text-xs text-slate-600 dark:text-slate-300">
+            Para cubrir <b>${item.name}</b> (${formatQ(item.amount)}) en <b>${item.accInfo.title}</b>, te faltan <b>${formatQ(item.shortage)}</b>.
+          </p>
+          <form onsubmit="submitFund(event, '${item.accountId}', '${item.name}')" class="space-y-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Transferir desde</label>
+              <select id="fund-from" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                ${otherAccounts.map(a => `<option value="${a.id}">${getAccountDisplay(a).title} (${formatQ(a.balance)})</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-600 dark:text-slate-300">Monto a transferir (Q)</label>
+              <input id="fund-amount" type="number" step="0.01" min="0.01" required value="${item.shortage.toFixed(2)}" class="w-full mt-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-extrabold" />
+            </div>
+            <button type="submit" class="w-full py-3 rounded-xl bg-slate-900 dark:bg-emerald-500 text-white dark:text-slate-950 font-bold text-sm">
+              Transferir ahora
+            </button>
+          </form>
+        </div>
+      `);
+    }
+
+    function submitFund(e, targetAccId, fixName) {
+      e.preventDefault();
+      const fromId = document.getElementById('fund-from').value;
+      const amount = parseFloat(document.getElementById('fund-amount').value);
+      if (!fromId) return;
+      applyBalanceChange('transferencia', amount, fromId, targetAccId, 1);
+      state.transactions.unshift({
+        id: 'tx_' + Date.now(),
+        type: 'transferencia',
+        amount,
+        category: 'transfer',
+        accountId: fromId,
+        toAccountId: targetAccId,
+        date: new Date().toISOString().slice(0, 10),
+        note: `Fondeo para ${fixName}`
+      });
+      saveState();
+      closeModal();
+      render();
+      showToast('Cuenta fondeada con éxito');
+    }
+
+    function openAlertsModal() {
+      const alerts = evaluateFixedExpenses().filter(f => f.needsAlert);
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Centro de alertas</h3>
+            <button onclick="closeModal()" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+          ${alerts.length === 0
+            ? `<p class="text-xs text-slate-500 dark:text-slate-400 py-4 text-center">Todo en orden. Ningún cobro fijo próximo tiene saldo insuficiente.</p>`
+            : alerts.map(a => `
+              <div class="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 space-y-2">
+                <p class="font-bold text-sm text-rose-900 dark:text-rose-200">${a.name} — ${formatQ(a.amount)}</p>
+                <p class="text-xs text-rose-700 dark:text-rose-300">Cobra el día ${a.dayOfMonth} (en ${a.daysLeft}d) en <b>${a.accInfo.title}</b>, pero faltan <b>${formatQ(a.shortage)}</b>.</p>
+                <button onclick="openFundModal('${a.id}')" class="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-800 text-white text-xs font-semibold">Fondear cuenta</button>
+              </div>
+            `).join('')
+          }
+        </div>
+      `);
+    }
+
+    function openBackupModal() {
+      openModal(`
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Copia de seguridad</h3>
+            <button onclick="closeModal()" class="p-1 text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Exporta o restaura tus bancos, cuentas, movimientos y gastos fijos en formato JSON.</p>
+          <div class="grid grid-cols-2 gap-2.5">
+            <button onclick="exportBackup()" class="py-2.5 px-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5">
+              <i data-lucide="download-cloud" class="w-4 h-4"></i> Exportar JSON
+            </button>
+            <label class="py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+              <i data-lucide="upload-cloud" class="w-4 h-4"></i> Importar JSON
+              <input type="file" accept=".json" onchange="importBackup(event)" class="hidden" />
+            </label>
+          </div>
+        </div>
+      `);
+    }
+
+    function exportBackup() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `respaldo-boveda-q-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      showToast('Respaldo descargado');
+    }
+
+    function importBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed.accounts && parsed.transactions) {
+            state = { ...getDefaultState(), ...parsed };
+            saveState();
+            closeModal();
+            render();
+            showToast('Respaldo restaurado correctamente');
+          } else {
+            showToast('Archivo de respaldo no válido');
+          }
+        } catch {
+          showToast('Error al leer el archivo');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    window.addEventListener('online', () => document.getElementById('offline-badge').classList.add('hidden'));
+    window.addEventListener('offline', () => document.getElementById('offline-badge').classList.remove('hidden'));
+
+    render();
+  </script>
+</body>
+</html>
